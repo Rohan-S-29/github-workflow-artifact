@@ -1,0 +1,97 @@
+name: Python CI/CD with artifacts
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+  run-tests:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: installing dependencies
+        run: pip install -r requirements.txt
+
+      - name: created logs directory
+        run: mkdir -p logs
+
+      - name: run unit tests
+        run: python -m unittest discover -s tests -p "test_unittest.py" > logs/unittest-results.log
+
+      - name: run Pytest
+        run: pytest --junitxml=logs/pytest-results.xml
+
+      - name: upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: logs/
+
+  build:
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: download test results
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: logs/
+
+      - name: build docker image
+        run: |
+          docker build -t my-app .
+          docker save my-app -o logs/my-app.tar
+
+      - name: upload docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: logs/my-app.tar
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: download docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: logs/
+
+      - name: load docker image
+        run: docker load -i logs/my-app.tar
+
+      - name: run docker container
+        run: |
+          docker run -d -p 8000:8000 my-app
+          echo "deployment complete" > logs/deployment.log
+
+      - name: upload deployment logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-logs
+          path: logs/
