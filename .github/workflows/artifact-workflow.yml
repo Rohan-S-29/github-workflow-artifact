@@ -39,7 +39,7 @@ jobs:
         run: python -m unittest discover -s tests -p "test_unittest1.py" > logs/unittest-results.log
 
       - name: run Pytest
-        run: pytest --junitxml=logs/pytest-results.xml
+        run: export PYTHONPATH=$PWD && pytest --junitxml=logs/pytest-results.xml
 
       - name: upload test results
         uses: actions/upload-artifact@v4
